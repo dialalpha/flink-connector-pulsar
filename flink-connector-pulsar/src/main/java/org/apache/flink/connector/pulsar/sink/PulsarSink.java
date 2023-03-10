@@ -18,12 +18,17 @@
 
 package org.apache.flink.connector.pulsar.sink;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import javax.annotation.Nullable;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.pulsar.common.crypto.PulsarCrypto;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallback;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallbackFactory;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommittable;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommittableSerializer;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommitter;
@@ -37,12 +42,7 @@ import org.apache.flink.connector.pulsar.sink.writer.router.TopicRoutingMode;
 import org.apache.flink.connector.pulsar.sink.writer.serializer.PulsarSerializationSchema;
 import org.apache.flink.connector.pulsar.sink.writer.topic.MetadataListener;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-
 import org.apache.pulsar.client.api.PulsarClientException;
-
-import javax.annotation.Nullable;
-
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * The Sink implementation of Pulsar. Please use a {@link PulsarSinkBuilder} to construct a {@link
@@ -91,6 +91,7 @@ public class PulsarSink<IN> implements TwoPhaseCommittingSink<IN, PulsarCommitta
     private final TopicRouter<IN> topicRouter;
     private final MessageDelayer<IN> messageDelayer;
     private final PulsarCrypto pulsarCrypto;
+    private final SinkUserCallbackFactory<IN> sinkUserCallbackFactory;
 
     PulsarSink(
             SinkConfiguration sinkConfiguration,
@@ -99,7 +100,8 @@ public class PulsarSink<IN> implements TwoPhaseCommittingSink<IN, PulsarCommitta
             TopicRoutingMode topicRoutingMode,
             @Nullable TopicRouter<IN> topicRouter,
             MessageDelayer<IN> messageDelayer,
-            PulsarCrypto pulsarCrypto) {
+            PulsarCrypto pulsarCrypto,
+            @Nullable SinkUserCallbackFactory<IN> sinkUserCallbackFactory) {
         this.sinkConfiguration = checkNotNull(sinkConfiguration);
         this.serializationSchema = checkNotNull(serializationSchema);
         this.metadataListener = checkNotNull(metadataListener);
@@ -116,6 +118,7 @@ public class PulsarSink<IN> implements TwoPhaseCommittingSink<IN, PulsarCommitta
 
         this.messageDelayer = checkNotNull(messageDelayer);
         this.pulsarCrypto = checkNotNull(pulsarCrypto);
+        this.sinkUserCallbackFactory = sinkUserCallbackFactory;
     }
 
     /**
@@ -132,6 +135,11 @@ public class PulsarSink<IN> implements TwoPhaseCommittingSink<IN, PulsarCommitta
     @Override
     public PrecommittingSinkWriter<IN, PulsarCommittable> createWriter(InitContext initContext)
             throws PulsarClientException {
+        SinkUserCallback<IN> userCallback = null;
+        if (sinkUserCallbackFactory != null) {
+            userCallback = sinkUserCallbackFactory.create();
+        }
+
         return new PulsarWriter<>(
                 sinkConfiguration,
                 serializationSchema,
@@ -139,7 +147,8 @@ public class PulsarSink<IN> implements TwoPhaseCommittingSink<IN, PulsarCommitta
                 topicRouter,
                 messageDelayer,
                 pulsarCrypto,
-                initContext);
+                initContext,
+                userCallback);
     }
 
     @Internal

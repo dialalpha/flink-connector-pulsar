@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
@@ -78,7 +79,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     private final MailboxExecutor mailboxExecutor;
     private final AtomicLong pendingMessages;
 
-    private SinkUserCallback<IN> userCallback; //todo: make final
+    private final SinkUserCallback<IN> userCallback;
 
     /**
      * Constructor creating a Pulsar writer.
@@ -95,13 +96,14 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
      * @param initContext Context to provide information about the runtime environment.
      */
     public PulsarWriter(
-            SinkConfiguration sinkConfiguration,
-            PulsarSerializationSchema<IN> serializationSchema,
-            MetadataListener metadataListener,
-            TopicRouter<IN> topicRouter,
-            MessageDelayer<IN> messageDelayer,
-            PulsarCrypto pulsarCrypto,
-            InitContext initContext)
+        SinkConfiguration sinkConfiguration,
+        PulsarSerializationSchema<IN> serializationSchema,
+        MetadataListener metadataListener,
+        TopicRouter<IN> topicRouter,
+        MessageDelayer<IN> messageDelayer,
+        PulsarCrypto pulsarCrypto,
+        InitContext initContext,
+        @Nullable SinkUserCallback<IN> userCallback)
             throws PulsarClientException {
         checkNotNull(sinkConfiguration);
         this.serializationSchema = checkNotNull(serializationSchema);
@@ -131,6 +133,8 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
             throw new FlinkRuntimeException("Cannot initialize schema.", e);
         }
 
+        this.userCallback = userCallback;
+
         // Create this producer register after opening serialization schema!
         SinkWriterMetricGroup metricGroup = initContext.metricGroup();
         this.producerRegister = new ProducerRegister(sinkConfiguration, pulsarCrypto, metricGroup);
@@ -148,7 +152,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         TopicPartition partition = topicRouter.route(element, key, partitions, sinkContext);
         String topic = partition.getFullTopicName();
 
-        // process via user callback before send
+        // invoke user callback before send
         if (userCallback != null) {
             message = userCallback.beforeSend(element, message, topic);
         }

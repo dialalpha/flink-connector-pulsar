@@ -32,5 +32,5 @@ public interface SinkUserCallback<IN> extends AutoCloseable {
      * @param topic the topic or partition that the message was sent to.
      * @param ex the exception.
      */
-    void onSendFailed(IN element, PulsarMessage<?> message, String topic, @Nullable Throwable ex);
+    void onSendFailed(IN element, PulsarMessage<?> message, String topic, Throwable ex);
 }
