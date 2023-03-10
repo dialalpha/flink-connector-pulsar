@@ -26,7 +26,10 @@ import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.pulsar.common.config.PulsarConfigBuilder;
 import org.apache.flink.connector.pulsar.common.config.PulsarOptions;
 import org.apache.flink.connector.pulsar.common.crypto.PulsarCrypto;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallback;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallbackFactory;
 import org.apache.flink.connector.pulsar.sink.config.SinkConfiguration;
+import org.apache.flink.connector.pulsar.sink.writer.PulsarWriter;
 import org.apache.flink.connector.pulsar.sink.writer.delayer.MessageDelayer;
 import org.apache.flink.connector.pulsar.sink.writer.router.TopicRouter;
 import org.apache.flink.connector.pulsar.sink.writer.router.TopicRoutingMode;
@@ -115,6 +118,7 @@ public class PulsarSinkBuilder<IN> {
     private TopicRouter<IN> topicRouter;
     private MessageDelayer<IN> messageDelayer;
     private PulsarCrypto pulsarCrypto;
+    private SinkUserCallbackFactory<IN> userCallbackFactory;
 
     // private builder constructor.
     PulsarSinkBuilder() {
@@ -389,6 +393,19 @@ public class PulsarSinkBuilder<IN> {
     }
 
     /**
+     * Set a factory for the {@link SinkUserCallback}. A callback is instantiated in each {@link
+     * PulsarWriter} and disposed of when the app shuts down.
+     *
+     * @param userCallbackFactory the factory.
+     * @return this PuslarSourceBuilder
+     */
+    public PulsarSinkBuilder<IN> setUserCallbackFactory(
+            SinkUserCallbackFactory<IN> userCallbackFactory) {
+        this.userCallbackFactory = userCallbackFactory;
+        return this;
+    }
+
+    /**
      * Build the {@link PulsarSink}.
      *
      * @return a PulsarSink with the settings made for this builder.
@@ -484,7 +501,8 @@ public class PulsarSinkBuilder<IN> {
                 topicRoutingMode,
                 topicRouter,
                 messageDelayer,
-                pulsarCrypto);
+                pulsarCrypto,
+                userCallbackFactory);
     }
 
     // ------------- private helpers  --------------
