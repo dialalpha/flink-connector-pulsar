@@ -20,6 +20,7 @@ package org.apache.flink.connector.pulsar.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
+import org.apache.flink.connector.pulsar.source.callback.SourceUserCallback;
 import org.apache.flink.connector.pulsar.source.reader.deserializer.PulsarDeserializationSchema;
 import org.apache.flink.connector.pulsar.source.split.PulsarPartitionSplitState;
 import org.apache.flink.util.Collector;
@@ -35,6 +36,7 @@ public class PulsarRecordEmitter<T>
 
     private final PulsarDeserializationSchema<T> deserializationSchema;
     private final SourceOutputWrapper<T> sourceOutputWrapper;
+    private SourceUserCallback<T> userCallback;
 
     public PulsarRecordEmitter(PulsarDeserializationSchema<T> deserializationSchema) {
         this.deserializationSchema = deserializationSchema;
@@ -45,6 +47,14 @@ public class PulsarRecordEmitter<T>
     public void emitRecord(
             Message<byte[]> element, SourceOutput<T> output, PulsarPartitionSplitState splitState)
             throws Exception {
+        // pass the message to the user callback
+        Message<byte[]> userElement;
+        if (userCallback != null) {
+            userElement = userCallback.beforeCollect(element);
+        } else {
+            userElement = element;
+        }
+
         // Update the source output.
         sourceOutputWrapper.setSourceOutput(output);
         sourceOutputWrapper.setTimestamp(element);
@@ -52,15 +62,24 @@ public class PulsarRecordEmitter<T>
         // Deserialize the message and since it to output.
         deserializationSchema.deserialize(element, sourceOutputWrapper);
         splitState.setLatestConsumedId(element.getMessageId());
+        if (userCallback != null) {
+            userCallback.afterCollect(element, sourceOutputWrapper.getCollectedValue());
+        }
 
         // Release the messages if we use message pool in Pulsar.
-        element.release();
+        if (element == userElement) {
+            element.release();
+        } else {
+            userElement.release();
+            element.release();
+        }
     }
 
     private static class SourceOutputWrapper<T> implements Collector<T> {
 
         private SourceOutput<T> sourceOutput;
         private long timestamp;
+        private T collectedValue;
 
         @Override
         public void collect(T record) {
@@ -69,6 +88,11 @@ public class PulsarRecordEmitter<T>
             } else {
                 sourceOutput.collect(record);
             }
+            collectedValue = record;
+        }
+
+        public T getCollectedValue() {
+            return collectedValue;
         }
 
         @Override
