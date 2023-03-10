@@ -18,6 +18,16 @@
 
 package org.apache.flink.connector.pulsar.sink.writer;
 
+import static java.util.Collections.emptyList;
+import static org.apache.flink.util.IOUtils.closeAll;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
@@ -26,6 +36,7 @@ import org.apache.flink.api.connector.sink2.Sink.InitContext;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink.PrecommittingSinkWriter;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.pulsar.common.crypto.PulsarCrypto;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallback;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommittable;
 import org.apache.flink.connector.pulsar.sink.config.SinkConfiguration;
 import org.apache.flink.connector.pulsar.sink.writer.context.PulsarSinkContext;
@@ -38,27 +49,14 @@ import org.apache.flink.connector.pulsar.sink.writer.topic.MetadataListener;
 import org.apache.flink.connector.pulsar.sink.writer.topic.ProducerRegister;
 import org.apache.flink.connector.pulsar.source.enumerator.topic.TopicPartition;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
-import org.apache.flink.util.FlinkRuntimeException;
-
 import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
-
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TypedMessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static java.util.Collections.emptyList;
-import static org.apache.flink.util.IOUtils.closeAll;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * This class is responsible to write records in a Pulsar topic and to handle the different delivery
@@ -79,6 +77,8 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     private final ProducerRegister producerRegister;
     private final MailboxExecutor mailboxExecutor;
     private final AtomicLong pendingMessages;
+
+    private SinkUserCallback userCallback; //todo: make final
 
     /**
      * Constructor creating a Pulsar writer.
@@ -141,6 +141,11 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     @Override
     public void write(IN element, Context context) throws IOException, InterruptedException {
         PulsarMessage<?> message = serializationSchema.serialize(element, sinkContext);
+
+        // process via user callback before send
+        if (userCallback != null) {
+            message = userCallback.beforeSend(element, message);
+        }
 
         // Choose the right topic to send.
         String key = message.getKey();
