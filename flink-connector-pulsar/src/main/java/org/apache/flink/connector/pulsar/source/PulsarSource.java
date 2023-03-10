@@ -29,6 +29,8 @@ import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.connector.pulsar.common.crypto.PulsarCrypto;
+import org.apache.flink.connector.pulsar.source.callback.SourceUserCallback;
+import org.apache.flink.connector.pulsar.source.callback.SourceUserCallbackFactory;
 import org.apache.flink.connector.pulsar.source.config.SourceConfiguration;
 import org.apache.flink.connector.pulsar.source.enumerator.PulsarSourceEnumState;
 import org.apache.flink.connector.pulsar.source.enumerator.PulsarSourceEnumStateSerializer;
@@ -44,6 +46,8 @@ import org.apache.flink.connector.pulsar.source.split.PulsarPartitionSplitSerial
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
 import org.apache.pulsar.client.api.PulsarClientException;
+
+import javax.annotation.Nullable;
 
 /**
  * The Source implementation of Pulsar. Please use a {@link PulsarSourceBuilder} to construct a
@@ -93,6 +97,8 @@ public final class PulsarSource<OUT>
 
     private final PulsarCrypto pulsarCrypto;
 
+    private final SourceUserCallbackFactory<OUT> userCallbackFactory;
+
     /**
      * The constructor for PulsarSource, it's package protected for forcing using {@link
      * PulsarSourceBuilder}.
@@ -105,7 +111,8 @@ public final class PulsarSource<OUT>
             StopCursor stopCursor,
             Boundedness boundedness,
             PulsarDeserializationSchema<OUT> deserializationSchema,
-            PulsarCrypto pulsarCrypto) {
+            PulsarCrypto pulsarCrypto,
+            @Nullable SourceUserCallbackFactory<OUT> userCallbackFactory) {
         this.sourceConfiguration = sourceConfiguration;
         this.subscriber = subscriber;
         this.rangeGenerator = rangeGenerator;
@@ -114,6 +121,7 @@ public final class PulsarSource<OUT>
         this.boundedness = boundedness;
         this.deserializationSchema = deserializationSchema;
         this.pulsarCrypto = pulsarCrypto;
+        this.userCallbackFactory = userCallbackFactory;
     }
 
     /**
@@ -134,8 +142,16 @@ public final class PulsarSource<OUT>
     @Override
     public SourceReader<OUT, PulsarPartitionSplit> createReader(SourceReaderContext readerContext)
             throws Exception {
+        SourceUserCallback<OUT> userCallback = null;
+        if (userCallbackFactory != null) {
+            userCallback = userCallbackFactory.create();
+        }
         return PulsarSourceReader.create(
-                sourceConfiguration, deserializationSchema, pulsarCrypto, readerContext);
+                sourceConfiguration,
+                deserializationSchema,
+                pulsarCrypto,
+                readerContext,
+                userCallback);
     }
 
     @Internal

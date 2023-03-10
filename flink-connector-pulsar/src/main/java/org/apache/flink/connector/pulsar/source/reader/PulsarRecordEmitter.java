@@ -27,6 +27,8 @@ import org.apache.flink.util.Collector;
 
 import org.apache.pulsar.client.api.Message;
 
+import javax.annotation.Nullable;
+
 /**
  * The {@link RecordEmitter} implementation for {@link PulsarSourceReader}. We would always update
  * the last consumed message id in this emitter.
@@ -36,10 +38,13 @@ public class PulsarRecordEmitter<T>
 
     private final PulsarDeserializationSchema<T> deserializationSchema;
     private final SourceOutputWrapper<T> sourceOutputWrapper;
-    private SourceUserCallback<T> userCallback;
+    private final SourceUserCallback<T> userCallback;
 
-    public PulsarRecordEmitter(PulsarDeserializationSchema<T> deserializationSchema) {
+    public PulsarRecordEmitter(
+            PulsarDeserializationSchema<T> deserializationSchema,
+            @Nullable SourceUserCallback<T> userCallback) {
         this.deserializationSchema = deserializationSchema;
+        this.userCallback = userCallback;
         this.sourceOutputWrapper = new SourceOutputWrapper<>();
     }
 

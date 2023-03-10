@@ -20,8 +20,11 @@ package org.apache.flink.connector.pulsar.sink.callback;
 
 import java.io.Serializable;
 
- /** A serializable factory for SinkUserCallback.
-  * @param <IN> the input type of the Sink */
+/**
+ * A serializable factory for SinkUserCallback.
+ *
+ * @param <IN> the input type of the Sink
+ */
 public interface SinkUserCallbackFactory<IN> extends Serializable {
     SinkUserCallback<IN> create();
 }
