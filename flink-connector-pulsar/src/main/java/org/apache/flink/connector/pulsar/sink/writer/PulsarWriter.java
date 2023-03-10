@@ -142,16 +142,16 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     public void write(IN element, Context context) throws IOException, InterruptedException {
         PulsarMessage<?> message = serializationSchema.serialize(element, sinkContext);
 
-        // process via user callback before send
-        if (userCallback != null) {
-            message = userCallback.beforeSend(element, message);
-        }
-
         // Choose the right topic to send.
         String key = message.getKey();
         List<TopicPartition> partitions = metadataListener.availablePartitions();
         TopicPartition partition = topicRouter.route(element, key, partitions, sinkContext);
         String topic = partition.getFullTopicName();
+
+        // process via user callback before send
+        if (userCallback != null) {
+            message = userCallback.beforeSend(element, message, topic);
+        }
 
         // Create message builder for sending messages.
         TypedMessageBuilder<?> builder = createMessageBuilder(topic, context, message);
