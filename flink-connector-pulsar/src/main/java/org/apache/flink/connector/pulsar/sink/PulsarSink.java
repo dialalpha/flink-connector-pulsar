@@ -18,9 +18,6 @@
 
 package org.apache.flink.connector.pulsar.sink;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
-import javax.annotation.Nullable;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Committer;
@@ -42,7 +39,12 @@ import org.apache.flink.connector.pulsar.sink.writer.router.TopicRoutingMode;
 import org.apache.flink.connector.pulsar.sink.writer.serializer.PulsarSerializationSchema;
 import org.apache.flink.connector.pulsar.sink.writer.topic.MetadataListener;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
+
 import org.apache.pulsar.client.api.PulsarClientException;
+
+import javax.annotation.Nullable;
+
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * The Sink implementation of Pulsar. Please use a {@link PulsarSinkBuilder} to construct a {@link

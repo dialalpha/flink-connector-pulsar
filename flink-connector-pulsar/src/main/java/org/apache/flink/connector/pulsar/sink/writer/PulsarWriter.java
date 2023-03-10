@@ -18,17 +18,6 @@
 
 package org.apache.flink.connector.pulsar.sink.writer;
 
-import static java.util.Collections.emptyList;
-import static org.apache.flink.util.IOUtils.closeAll;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
-import javax.annotation.Nullable;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
@@ -50,14 +39,29 @@ import org.apache.flink.connector.pulsar.sink.writer.topic.MetadataListener;
 import org.apache.flink.connector.pulsar.sink.writer.topic.ProducerRegister;
 import org.apache.flink.connector.pulsar.source.enumerator.topic.TopicPartition;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
-import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.util.FlinkRuntimeException;
+
+import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
+
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TypedMessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static java.util.Collections.emptyList;
+import static org.apache.flink.util.IOUtils.closeAll;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * This class is responsible to write records in a Pulsar topic and to handle the different delivery
@@ -96,14 +100,14 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
      * @param initContext Context to provide information about the runtime environment.
      */
     public PulsarWriter(
-        SinkConfiguration sinkConfiguration,
-        PulsarSerializationSchema<IN> serializationSchema,
-        MetadataListener metadataListener,
-        TopicRouter<IN> topicRouter,
-        MessageDelayer<IN> messageDelayer,
-        PulsarCrypto pulsarCrypto,
-        InitContext initContext,
-        @Nullable SinkUserCallback<IN> userCallback)
+            SinkConfiguration sinkConfiguration,
+            PulsarSerializationSchema<IN> serializationSchema,
+            MetadataListener metadataListener,
+            TopicRouter<IN> topicRouter,
+            MessageDelayer<IN> messageDelayer,
+            PulsarCrypto pulsarCrypto,
+            InitContext initContext,
+            @Nullable SinkUserCallback<IN> userCallback)
             throws PulsarClientException {
         checkNotNull(sinkConfiguration);
         this.serializationSchema = checkNotNull(serializationSchema);
@@ -172,9 +176,10 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         if (deliveryGuarantee == DeliveryGuarantee.NONE) {
             // We would just ignore the sending exception. This may cause data loss.
             sendFuture = builder.sendAsync();
-            sendFuture.whenComplete((id, ex) -> {
-                callUserCallbackAfterSend(element, userMessage, topic, id, ex);
-            });
+            sendFuture.whenComplete(
+                    (id, ex) -> {
+                        callUserCallbackAfterSend(element, userMessage, topic, id, ex);
+                    });
         } else {
             // Increase the pending message count.
             pendingMessages.incrementAndGet();
@@ -195,7 +200,11 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     }
 
     private void callUserCallbackAfterSend(
-        IN element, PulsarMessage<?> message, String topic, MessageId messageId, Throwable exception) {
+            IN element,
+            PulsarMessage<?> message,
+            String topic,
+            MessageId messageId,
+            Throwable exception) {
         if (userCallback == null) {
             return;
         }
