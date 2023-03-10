@@ -21,7 +21,7 @@ public interface SinkUserCallback<IN> extends AutoCloseable {
      * This method is called after producer has tried to write the message to the topic.
      * @param element the element received from the previous operator.
      * @param message the message that was sent to the topic.
-     * @param messageId the topic MessageId, if the send was successfull.
+     * @param messageId the topic MessageId, if the send operation was successful.
      */
     void onSendSucceeded(IN element, PulsarMessage<?> message, String topic, MessageId messageId);
 
