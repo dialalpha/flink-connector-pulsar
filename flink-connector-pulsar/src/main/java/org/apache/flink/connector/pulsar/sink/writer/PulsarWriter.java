@@ -78,7 +78,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     private final MailboxExecutor mailboxExecutor;
     private final AtomicLong pendingMessages;
 
-    private SinkUserCallback userCallback; //todo: make final
+    private SinkUserCallback<IN> userCallback; //todo: make final
 
     /**
      * Constructor creating a Pulsar writer.
