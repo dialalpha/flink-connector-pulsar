@@ -1,5 +1,7 @@
 package org.apache.flink.connector.pulsar.source.callback;
 
-public interface SourceUserCallbackFactory<T> {
+import java.io.Serializable;
+
+public interface SourceUserCallbackFactory<T> extends Serializable {
     SourceUserCallback<T> create();
 }
