@@ -154,7 +154,8 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         }
 
         // Create message builder for sending messages.
-        TypedMessageBuilder<?> builder = createMessageBuilder(topic, context, message);
+        final PulsarMessage<?> userMessage = message;
+        TypedMessageBuilder<?> builder = createMessageBuilder(topic, context, userMessage);
 
         // Message Delay delivery.
         long deliverAt = messageDelayer.deliverAt(element, sinkContext);
@@ -163,14 +164,18 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         }
 
         // Perform message sending.
+        CompletableFuture<MessageId> sendFuture;
         if (deliveryGuarantee == DeliveryGuarantee.NONE) {
             // We would just ignore the sending exception. This may cause data loss.
-            builder.sendAsync();
+            sendFuture = builder.sendAsync();
+            sendFuture.whenComplete((id, ex) -> {
+                callUserCallbackAfterSend(element, userMessage, topic, id, ex);
+            });
         } else {
             // Increase the pending message count.
             pendingMessages.incrementAndGet();
-            CompletableFuture<MessageId> future = builder.sendAsync();
-            future.whenComplete(
+            sendFuture = builder.sendAsync();
+            sendFuture.whenComplete(
                     (id, ex) -> {
                         pendingMessages.decrementAndGet();
                         if (ex != null) {
@@ -180,7 +185,21 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
                         } else {
                             LOG.debug("Sent message to Pulsar {} with message id {}", topic, id);
                         }
+                        callUserCallbackAfterSend(element, userMessage, topic, id, ex);
                     });
+        }
+    }
+
+    private void callUserCallbackAfterSend(
+        IN element, PulsarMessage<?> message, String topic, MessageId messageId, Throwable exception) {
+        if (userCallback == null) {
+            return;
+        }
+
+        if (exception == null) {
+            userCallback.onSendSucceeded(element, message, topic, messageId);
+        } else {
+            userCallback.onSendFailed(element, message, topic, exception);
         }
     }
 
