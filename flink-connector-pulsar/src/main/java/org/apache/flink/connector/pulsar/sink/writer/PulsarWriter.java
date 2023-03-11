@@ -304,10 +304,6 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     @Override
     public void close() throws Exception {
         // Close all the resources and throw the exception at last.
-        if (userCallback == null) {
-            closeAll(metadataListener, producerRegister);
-        } else {
-            closeAll(metadataListener, producerRegister, userCallback);
-        }
+        closeAll(metadataListener, producerRegister, userCallback);
     }
 }
