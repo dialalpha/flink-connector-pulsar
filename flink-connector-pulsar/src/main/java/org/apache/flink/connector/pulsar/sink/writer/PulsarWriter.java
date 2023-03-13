@@ -167,9 +167,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         }
 
         // invoke user callback before send
-        if (userCallback != null) {
-            userCallback.beforeSend(element, message, topic);
-        }
+        invokeUserCallbackBeforeSend(element, message, topic);
 
         // Perform message sending.
         CompletableFuture<MessageId> sendFuture;
@@ -178,7 +176,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
             sendFuture = builder.sendAsync();
             sendFuture.whenComplete(
                     (id, ex) -> {
-                        callUserCallbackAfterSend(element, userMessage, topic, id, ex);
+                        invokeUserCallbackAfterSend(element, userMessage, topic, id, ex);
                     });
         } else {
             // Increase the pending message count.
@@ -194,12 +192,28 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
                         } else {
                             LOG.debug("Sent message to Pulsar {} with message id {}", topic, id);
                         }
-                        callUserCallbackAfterSend(element, userMessage, topic, id, ex);
+                        invokeUserCallbackAfterSend(element, userMessage, topic, id, ex);
                     });
         }
     }
 
-    private void callUserCallbackAfterSend(
+    private void callSafely(Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            LOG.warn("Exception from user callback", t);
+        }
+    }
+
+    private void invokeUserCallbackBeforeSend(IN element, PulsarMessage<?> message, String topic) {
+        if (userCallback == null) {
+            return;
+        }
+
+        callSafely(() -> userCallback.beforeSend(element, message, topic));
+    }
+
+    private void invokeUserCallbackAfterSend(
             IN element,
             PulsarMessage<?> message,
             String topic,
@@ -210,9 +224,9 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         }
 
         if (exception == null) {
-            userCallback.onSendSucceeded(element, message, topic, messageId);
+            callSafely(() -> userCallback.onSendSucceeded(element, message, topic, messageId));
         } else {
-            userCallback.onSendFailed(element, message, topic, exception);
+            callSafely(() -> userCallback.onSendFailed(element, message, topic, exception));
         }
     }
 
