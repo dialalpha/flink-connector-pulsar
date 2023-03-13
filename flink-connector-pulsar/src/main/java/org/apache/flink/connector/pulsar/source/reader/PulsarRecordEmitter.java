@@ -53,11 +53,8 @@ public class PulsarRecordEmitter<T>
             Message<byte[]> element, SourceOutput<T> output, PulsarPartitionSplitState splitState)
             throws Exception {
         // pass the message to the user callback
-        Message<byte[]> userElement;
         if (userCallback != null) {
-            userElement = userCallback.beforeCollect(element);
-        } else {
-            userElement = element;
+            userCallback.beforeCollect(element);
         }
 
         // Update the source output.
@@ -72,12 +69,7 @@ public class PulsarRecordEmitter<T>
         }
 
         // Release the messages if we use message pool in Pulsar.
-        if (element == userElement) {
-            element.release();
-        } else {
-            userElement.release();
-            element.release();
-        }
+        element.release();
     }
 
     private static class SourceOutputWrapper<T> implements Collector<T> {

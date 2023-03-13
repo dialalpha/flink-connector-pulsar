@@ -156,12 +156,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         TopicPartition partition = topicRouter.route(element, key, partitions, sinkContext);
         String topic = partition.getFullTopicName();
 
-        // invoke user callback before send
-        if (userCallback != null) {
-            message = userCallback.beforeSend(element, message, topic);
-        }
-
-        // Create message builder for sending messages.
+        // Create message builder for sending messages
         final PulsarMessage<?> userMessage = message;
         TypedMessageBuilder<?> builder = createMessageBuilder(topic, context, userMessage);
 
@@ -169,6 +164,11 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         long deliverAt = messageDelayer.deliverAt(element, sinkContext);
         if (deliverAt > 0) {
             builder.deliverAt(deliverAt);
+        }
+
+        // invoke user callback before send
+        if (userCallback != null) {
+            userCallback.beforeSend(element, message, topic);
         }
 
         // Perform message sending.

@@ -35,11 +35,8 @@ public interface SinkUserCallback<IN> extends AutoCloseable {
      * @param element the element received from the previous operator.
      * @param message the message wrapper with the element already serialized.
      * @param topic the pulsar topic or partition that the message will be routed to.
-     * @return the message to send to the pulsar topic, potentially a new message.
      */
-    default PulsarMessage<?> beforeSend(IN element, PulsarMessage<?> message, String topic) {
-        return message;
-    }
+    void beforeSend(IN element, PulsarMessage<?> message, String topic);
 
     /**
      * This method is called after producer has tried to write the message to the topic.

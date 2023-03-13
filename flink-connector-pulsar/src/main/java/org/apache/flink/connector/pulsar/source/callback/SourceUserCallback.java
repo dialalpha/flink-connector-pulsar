@@ -35,9 +35,7 @@ public interface SourceUserCallback<T> extends AutoCloseable {
      * @param rawMessage the raw message from the pulsar topic
      * @return Either the same message or a modified message
      */
-    default Message<byte[]> beforeCollect(Message<byte[]> rawMessage) {
-        return rawMessage;
-    }
+    void beforeCollect(Message<byte[]> rawMessage);
 
     /**
      * This method is called after the message is handed off to the Collector, with the raw message
