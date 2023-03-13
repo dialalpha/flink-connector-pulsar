@@ -18,6 +18,8 @@
 
 package org.apache.flink.connector.pulsar.source.callback;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import org.apache.pulsar.client.api.Message;
 
 /**
@@ -25,6 +27,7 @@ import org.apache.pulsar.client.api.Message;
  *
  * @param <T> The output type of Source
  */
+@PublicEvolving
 public interface SourceUserCallback<T> extends AutoCloseable {
     /**
      * This method is called before the message is passed forward to the Collector The user can

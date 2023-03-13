@@ -18,6 +18,7 @@
 
 package org.apache.flink.connector.pulsar.sink.callback;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.pulsar.sink.writer.message.PulsarMessage;
 
 import org.apache.pulsar.client.api.MessageId;
@@ -27,6 +28,7 @@ import org.apache.pulsar.client.api.MessageId;
  *
  * @param <IN> The input type of the sink
  */
+@PublicEvolving
 public interface SinkUserCallback<IN> extends AutoCloseable {
     /**
      * This method is called before the message is sent to the topic. The user can modify the
