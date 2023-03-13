@@ -33,7 +33,6 @@ public interface SourceUserCallback<T> extends AutoCloseable {
      * <p>By default, this will return the unmodified message.
      *
      * @param rawMessage the raw message from the pulsar topic
-     * @return Either the same message or a modified message
      */
     void beforeCollect(Message<byte[]> rawMessage);
 
