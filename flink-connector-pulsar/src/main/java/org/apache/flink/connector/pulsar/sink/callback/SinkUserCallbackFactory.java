@@ -18,6 +18,8 @@
 
 package org.apache.flink.connector.pulsar.sink.callback;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import java.io.Serializable;
 
 /**
@@ -25,6 +27,7 @@ import java.io.Serializable;
  *
  * @param <IN> the input type of the Sink
  */
+@PublicEvolving
 public interface SinkUserCallbackFactory<IN> extends Serializable {
     SinkUserCallback<IN> create();
 }

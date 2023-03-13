@@ -18,6 +18,8 @@
 
 package org.apache.flink.connector.pulsar.source.callback;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import java.io.Serializable;
 
 /**
@@ -25,6 +27,7 @@ import java.io.Serializable;
  *
  * @param <T> the outupt type of the source
  */
+@PublicEvolving
 public interface SourceUserCallbackFactory<T> extends Serializable {
     SourceUserCallback<T> create();
 }
