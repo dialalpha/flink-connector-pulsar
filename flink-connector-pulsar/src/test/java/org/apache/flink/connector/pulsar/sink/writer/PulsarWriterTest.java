@@ -103,7 +103,8 @@ class PulsarWriterTest extends PulsarTestSuiteBase {
                         router,
                         delayer,
                         PulsarCrypto.disabled(),
-                        initContext);
+                        initContext,
+                        null);
 
         writer.flush(false);
         writer.prepareCommit();

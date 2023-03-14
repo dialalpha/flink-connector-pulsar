@@ -29,6 +29,7 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.connector.pulsar.common.crypto.PulsarCrypto;
 import org.apache.flink.connector.pulsar.common.schema.BytesSchema;
 import org.apache.flink.connector.pulsar.common.schema.PulsarSchema;
+import org.apache.flink.connector.pulsar.source.callback.SourceUserCallback;
 import org.apache.flink.connector.pulsar.source.config.SourceConfiguration;
 import org.apache.flink.connector.pulsar.source.enumerator.topic.TopicPartition;
 import org.apache.flink.connector.pulsar.source.reader.deserializer.PulsarDeserializationSchema;
@@ -46,6 +47,8 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -80,6 +83,7 @@ public class PulsarSourceReader<OUT>
     private final SourceConfiguration sourceConfiguration;
     private final PulsarClient pulsarClient;
     private final PulsarAdmin pulsarAdmin;
+    @Nullable private final SourceUserCallback<OUT> userCallback;
     @VisibleForTesting final SortedMap<Long, Map<TopicPartition, MessageId>> cursorsToCommit;
     private final ConcurrentMap<TopicPartition, MessageId> cursorsOfFinishedSplits;
     private final AtomicReference<Throwable> cursorCommitThrowable;
@@ -93,17 +97,19 @@ public class PulsarSourceReader<OUT>
             SourceConfiguration sourceConfiguration,
             PulsarClient pulsarClient,
             PulsarAdmin pulsarAdmin,
-            SourceReaderContext context) {
+            SourceReaderContext context,
+            @Nullable SourceUserCallback<OUT> userCallback) {
         super(
                 elementsQueue,
                 fetcherManager,
-                new PulsarRecordEmitter<>(deserializationSchema),
+                new PulsarRecordEmitter<>(deserializationSchema, userCallback),
                 sourceConfiguration,
                 context);
 
         this.sourceConfiguration = sourceConfiguration;
         this.pulsarClient = pulsarClient;
         this.pulsarAdmin = pulsarAdmin;
+        this.userCallback = userCallback;
 
         this.cursorsToCommit = Collections.synchronizedSortedMap(new TreeMap<>());
         this.cursorsOfFinishedSplits = new ConcurrentHashMap<>();
@@ -219,6 +225,11 @@ public class PulsarSourceReader<OUT>
         // Close the all the consumers.
         super.close();
 
+        // close the user callback
+        if (userCallback != null) {
+            userCallback.close();
+        }
+
         // Close shared pulsar resources.
         pulsarClient.shutdown();
         pulsarAdmin.close();
@@ -255,7 +266,8 @@ public class PulsarSourceReader<OUT>
             SourceConfiguration sourceConfiguration,
             PulsarDeserializationSchema<OUT> deserializationSchema,
             PulsarCrypto pulsarCrypto,
-            SourceReaderContext readerContext)
+            SourceReaderContext readerContext,
+            @Nullable SourceUserCallback<OUT> userCallback)
             throws Exception {
 
         // Create a message queue with the predefined source option.
@@ -304,6 +316,7 @@ public class PulsarSourceReader<OUT>
                 sourceConfiguration,
                 pulsarClient,
                 pulsarAdmin,
-                readerContext);
+                readerContext,
+                userCallback);
     }
 }
