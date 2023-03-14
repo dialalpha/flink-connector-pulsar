@@ -26,6 +26,8 @@ import org.apache.flink.connector.pulsar.source.split.PulsarPartitionSplitState;
 import org.apache.flink.util.Collector;
 
 import org.apache.pulsar.client.api.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -35,6 +37,7 @@ import javax.annotation.Nullable;
  */
 public class PulsarRecordEmitter<T>
         implements RecordEmitter<Message<byte[]>, T, PulsarPartitionSplitState> {
+    private static final Logger LOG = LoggerFactory.getLogger(PulsarRecordEmitter.class);
 
     private final PulsarDeserializationSchema<T> deserializationSchema;
     private final SourceOutputWrapper<T> sourceOutputWrapper;
@@ -54,7 +57,7 @@ public class PulsarRecordEmitter<T>
             throws Exception {
         // pass the message to the user callback
         if (userCallback != null) {
-            userCallback.beforeCollect(element);
+            callSafely(() -> userCallback.beforeCollect(element));
         }
 
         // Update the source output.
@@ -65,11 +68,22 @@ public class PulsarRecordEmitter<T>
         deserializationSchema.deserialize(element, sourceOutputWrapper);
         splitState.setLatestConsumedId(element.getMessageId());
         if (userCallback != null) {
-            userCallback.afterCollect(element, sourceOutputWrapper.getCollectedValue());
+            callSafely(
+                    () ->
+                            userCallback.afterCollect(
+                                    element, sourceOutputWrapper.getCollectedValue()));
         }
 
         // Release the messages if we use message pool in Pulsar.
         element.release();
+    }
+
+    private void callSafely(Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            LOG.warn("Exception from user callback", t);
+        }
     }
 
     private static class SourceOutputWrapper<T> implements Collector<T> {
