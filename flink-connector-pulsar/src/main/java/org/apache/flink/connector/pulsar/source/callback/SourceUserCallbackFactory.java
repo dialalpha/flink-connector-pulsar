@@ -25,7 +25,7 @@ import java.io.Serializable;
 /**
  * A serializable factory for SourceUserCallback.
  *
- * @param <T> the outupt type of the source
+ * @param <T> the output type of the source
  */
 @PublicEvolving
 public interface SourceUserCallbackFactory<T> extends Serializable {
