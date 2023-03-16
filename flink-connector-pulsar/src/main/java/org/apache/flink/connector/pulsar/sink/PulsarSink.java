@@ -23,6 +23,7 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallback;
 import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallbackFactory;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommittable;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommittableSerializer;
@@ -128,13 +129,18 @@ public class PulsarSink<IN> implements TwoPhaseCommittingSink<IN, PulsarCommitta
     @Internal
     @Override
     public PrecommittingSinkWriter<IN, PulsarCommittable> createWriter(InitContext initContext) {
+        SinkUserCallback<IN> userCallback = null;
+        if (sinkUserCallbackFactory != null) {
+            userCallback = sinkUserCallbackFactory.create();
+        }
         return new PulsarWriter<>(
                 sinkConfiguration,
                 serializationSchema,
                 metadataListener,
                 topicRouter,
                 messageDelayer,
-                initContext);
+                initContext,
+                userCallback);
     }
 
     @Internal

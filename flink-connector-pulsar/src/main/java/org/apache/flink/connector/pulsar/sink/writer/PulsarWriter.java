@@ -25,6 +25,7 @@ import org.apache.flink.api.common.serialization.SerializationSchema.Initializat
 import org.apache.flink.api.connector.sink2.Sink.InitContext;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink.PrecommittingSinkWriter;
 import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.flink.connector.pulsar.sink.callback.SinkUserCallback;
 import org.apache.flink.connector.pulsar.sink.committer.PulsarCommittable;
 import org.apache.flink.connector.pulsar.sink.config.SinkConfiguration;
 import org.apache.flink.connector.pulsar.sink.writer.context.PulsarSinkContext;
@@ -39,6 +40,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TypedMessageBuilder;
 import org.slf4j.Logger;
@@ -69,6 +71,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
     private final TopicMetadataListener metadataListener;
     private final TopicRouter<IN> topicRouter;
     private final MessageDelayer<IN> messageDelayer;
+    private final SinkUserCallback<IN> userCallback;
     private final DeliveryGuarantee deliveryGuarantee;
     private final PulsarSinkContext sinkContext;
     private final MailboxExecutor mailboxExecutor;
@@ -88,6 +91,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
      * @param metadataListener The listener for querying topic metadata.
      * @param topicRouter Topic router to choose topic by incoming records.
      * @param initContext Context to provide information about the runtime environment.
+     * @param userCallback the user callback.
      */
     public PulsarWriter(
             SinkConfiguration sinkConfiguration,
@@ -95,12 +99,14 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
             TopicMetadataListener metadataListener,
             TopicRouter<IN> topicRouter,
             MessageDelayer<IN> messageDelayer,
-            InitContext initContext) {
+            InitContext initContext,
+            SinkUserCallback<IN> userCallback) {
         this.sinkConfiguration = checkNotNull(sinkConfiguration);
         this.serializationSchema = checkNotNull(serializationSchema);
         this.metadataListener = checkNotNull(metadataListener);
         this.topicRouter = checkNotNull(topicRouter);
         this.messageDelayer = checkNotNull(messageDelayer);
+        this.userCallback = userCallback;
         checkNotNull(initContext);
 
         this.deliveryGuarantee = sinkConfiguration.getDeliveryGuarantee();
@@ -146,20 +152,28 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
             builder.deliverAt(deliverAt);
         }
 
+        // invoke user callback before send
+        invokeUserCallbackBeforeSend(element, message, topic);
+
         // Perform message sending.
         if (deliveryGuarantee == DeliveryGuarantee.NONE) {
             // We would just ignore the sending exception. This may cause data loss.
-            builder.sendAsync();
+            builder.sendAsync()
+                    .whenComplete(
+                            (id, ex) -> {
+                                invokeUserCallbackAfterSend(element, message, topic, id, ex);
+                            });
         } else {
             // Waiting for permits to write message.
             requirePermits();
             mailboxExecutor.execute(
-                    () -> enqueueMessageSending(topic, builder),
+                    () -> enqueueMessageSending(topic, builder, element, message),
                     "Failed to send message to Pulsar");
         }
     }
 
-    private void enqueueMessageSending(String topic, TypedMessageBuilder<?> builder)
+    private void enqueueMessageSending(
+            String topic, TypedMessageBuilder<?> builder, IN element, PulsarMessage<?> message)
             throws ExecutionException, InterruptedException {
         // Block the mailbox executor for yield method.
         builder.sendAsync()
@@ -173,6 +187,7 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
                                 LOG.debug(
                                         "Sent message to Pulsar {} with message id {}", topic, id);
                             }
+                            invokeUserCallbackAfterSend(element, message, topic, id, ex);
                         })
                 .get();
     }
@@ -241,6 +256,39 @@ public class PulsarWriter<IN> implements PrecommittingSinkWriter<IN, PulsarCommi
         }
 
         return builder;
+    }
+
+    private void callSafely(Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            LOG.warn("Exception from user callback", t);
+        }
+    }
+
+    private void invokeUserCallbackBeforeSend(IN element, PulsarMessage<?> message, String topic) {
+        if (userCallback == null) {
+            return;
+        }
+
+        callSafely(() -> userCallback.beforeSend(element, message, topic));
+    }
+
+    private void invokeUserCallbackAfterSend(
+            IN element,
+            PulsarMessage<?> message,
+            String topic,
+            MessageId messageId,
+            Throwable exception) {
+        if (userCallback == null) {
+            return;
+        }
+
+        if (exception == null) {
+            callSafely(() -> userCallback.onSendSucceeded(element, message, topic, messageId));
+        } else {
+            callSafely(() -> userCallback.onSendFailed(element, message, topic, exception));
+        }
     }
 
     @Override
