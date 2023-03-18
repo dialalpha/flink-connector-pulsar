@@ -116,6 +116,9 @@ class PulsarWriterTest extends PulsarTestSuiteBase {
         assertEquals(1, userCallback.getBeforeSendCalled());
         assertEquals(1, userCallback.getOnSendSucceededCalled());
         assertEquals(0, userCallback.getOnSendFailedCalled());
+
+        writer.close();
+        assertEquals(1, userCallback.getCloseCalled());
     }
 
     private SinkConfiguration sinkConfiguration(DeliveryGuarantee deliveryGuarantee) {
