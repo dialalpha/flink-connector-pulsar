@@ -96,12 +96,16 @@ abstract class PulsarSourceReaderTestBase extends PulsarTestSuiteBase {
 
     @TestTemplate
     void assignZeroSplitsCreatesZeroSubscription(
-            PulsarSourceReaderBase<Integer> reader, Boundedness boundedness, String topicName)
+            PulsarSourceReaderBase<Integer> reader,
+            Boundedness boundedness,
+            String topicName,
+            MockSourceUserCallback<Integer> userCallback)
             throws Exception {
         reader.snapshotState(100L);
         reader.notifyCheckpointComplete(100L);
         // Verify the committed offsets.
         reader.close();
+        assertThat(userCallback.getCloseCalled()).isGreaterThan(0);
         for (int i = 0; i < PulsarRuntimeOperator.DEFAULT_PARTITIONS; i++) {
             verifyNoSubscriptionCreated(TopicNameUtils.topicNameWithPartition(topicName, i));
         }
